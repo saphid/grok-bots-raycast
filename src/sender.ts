@@ -124,8 +124,91 @@ export function validateMessage(message: string): string | undefined {
     return "Keep the message within 32,000 UTF-8 bytes.";
 }
 
+export type NewBot = { alias: string; name: string; url: string; key: string };
+export type NewBotErrors = Partial<Record<keyof NewBot, string>>;
+const addError =
+  "Couldn’t save this Bot. Check the webhook URL and key, then try again. Existing Bots were not changed.";
+
+export function suggestAlias(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+/, "")
+    .slice(0, 48)
+    .replace(/-+$/, "");
+}
+
+// Field-level checks for the Raycast form. The sender validates again and has the final say.
+export function validateNewBot(
+  bot: NewBot,
+  existingAliases: string[] = [],
+): NewBotErrors {
+  const errors: NewBotErrors = {};
+  const name = bot.name.trim();
+  if (
+    !name ||
+    name.length > 100 ||
+    [...name].some(
+      (char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127,
+    )
+  )
+    errors.name = "Enter a name";
+  if (!aliasPattern.test(bot.alias)) errors.alias = "Use a–z, 0–9 and hyphens";
+  else if (existingAliases.includes(bot.alias))
+    errors.alias = "Alias already in use";
+  let url: URL | undefined;
+  try {
+    url = new URL(bot.url.trim());
+  } catch {
+    /* Reported below. */
+  }
+  if (
+    !url ||
+    url.protocol !== "https:" ||
+    url.hostname !== "api2.cursor.sh" ||
+    url.port ||
+    url.username ||
+    url.password ||
+    !/^\/automations\/webhook\/[A-Za-z0-9_-]+$/.test(url.pathname) ||
+    url.search ||
+    url.hash
+  )
+    errors.url = "Use the api2.cursor.sh webhook URL";
+  const key = bot.key.trim();
+  if (/^bearer\s/i.test(key)) errors.key = "Key only, without Bearer";
+  else if (
+    !key ||
+    /\s/.test(key) ||
+    key.length > 4096 ||
+    [...key].some(
+      (char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127,
+    )
+  )
+    errors.key = "Paste the webhook key";
+  return errors;
+}
+
 export class Sender {
   constructor(private readonly run: Runner = runCli) {}
+
+  // Credentials travel on stdin only, never in arguments. The sender refuses existing aliases.
+  async add(bot: NewBot): Promise<void> {
+    if (Object.keys(validateNewBot(bot)).length) throw new Error(addError);
+    let result: RunResult;
+    try {
+      result = await this.run(
+        ["add", bot.alias, "--stdin"],
+        JSON.stringify({
+          name: bot.name.trim(),
+          url: bot.url.trim(),
+          key: bot.key.trim(),
+        }),
+      );
+    } catch {
+      throw new Error(addError);
+    }
+    if (result.code !== 0) throw new Error(addError);
+  }
 
   async list(): Promise<Bot[]> {
     const result = await this.run(["list"]);

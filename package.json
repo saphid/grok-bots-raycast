@@ -19,6 +19,12 @@
       "title": "Message Grok Bot",
       "description": "Compose a message and inspect delivery receipts",
       "mode": "view"
+    },
+    {
+      "name": "add-bot",
+      "title": "Add Grok Bot",
+      "description": "Connect a Bot's webhook routine privately",
+      "mode": "view"
     }
   ],
   "scripts": {

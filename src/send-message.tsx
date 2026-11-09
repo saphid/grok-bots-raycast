@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from "react";
 import { deliver, loadHistory, saveReceipt, Storage } from "./history";
 import { Bot, createRequest, Receipt, Sender, validateMessage } from "./sender";
 import { parseComposeQuery } from "./compose-query";
+import { AddBotForm } from "./add-bot";
 
 async function openBot() {
   try {
@@ -294,7 +295,7 @@ function Compose({
 }
 
 export default function Command() {
-  const { push } = useNavigation();
+  const { push, pop } = useNavigation();
   const [bots, setBots] = useState<Bot[]>([]);
   const [history, setHistory] = useState<Receipt[]>([]);
   const [busy, setBusy] = useState(true);
@@ -329,6 +330,26 @@ export default function Command() {
   useEffect(() => {
     void load();
   }, []);
+  function addBot() {
+    push(
+      <AddBotForm
+        existingAliases={bots.map((bot) => bot.alias)}
+        onAdded={async () => {
+          pop();
+          setSearchText("");
+          await load();
+        }}
+      />,
+    );
+  }
+  const addBotAction = (
+    <Action
+      title="Add Bot"
+      icon={Icon.Plus}
+      shortcut={Keyboard.Shortcut.Common.New}
+      onAction={addBot}
+    />
+  );
 
   function receiptRow(receipt: Receipt) {
     const state = states[receipt.status];
@@ -482,6 +503,7 @@ export default function Command() {
                   icon={Icon.Message}
                   onAction={openBot}
                 />
+                {addBotAction}
                 <Action
                   title="Reload Bots and History"
                   icon={Icon.ArrowClockwise}
@@ -511,12 +533,13 @@ export default function Command() {
           }
           description={
             bots.length === 0 && history.length === 0
-              ? "Add a Bot privately with grok-bots in your terminal, then reload."
+              ? "Add a Bot with its webhook routine’s URL and key."
               : "Clear your search to choose a Bot, or type a configured alias followed by your message."
           }
           icon={Icon.Message}
           actions={
             <ActionPanel>
+              {bots.length === 0 && !searchText && addBotAction}
               <Action
                 title={searchText ? "Clear Search" : "Reload Bots"}
                 icon={Icon.ArrowClockwise}

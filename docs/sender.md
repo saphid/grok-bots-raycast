@@ -1,6 +1,6 @@
 # Sender contract
 
-The extension invokes `~/.local/bin/grok-bots` with `spawn`, a fixed executable path, `shell: false`, argument arrays and message stdin. It never reads credential files. `npm run setup` installs the bundled CLI only when that path is unused. A compatible existing sender can be kept instead.
+The extension invokes `~/.local/bin/grok-bots` with `spawn`, a fixed executable path, `shell: false`, argument arrays and message stdin. It never reads credential files. The **Add Grok Bot** form passes a new Bot's name, URL and key to `add <alias> --stdin`, never in arguments. `npm run setup` installs the bundled CLI only when that path is unused. A compatible existing sender can be kept instead.
 
 ## Commands
 
@@ -10,7 +10,7 @@ The extension invokes `~/.local/bin/grok-bots` with `spawn`, a fixed executable 
 | `send <alias> --id <request-id>` | Exact message on stdin                                          | One JSON delivery receipt.                                                  |
 | `status <request-id>`            | Previously used ID                                              | The same locally stored receipt; no network call.                           |
 | `add <alias>`                    | Interactive private terminal prompts                            | Adds private config without replacing an existing alias.                    |
-| `add <alias> --stdin`            | Private JSON on stdin: `name`, `url`, `key`, optional `chatUrl` | Noninteractive setup; never put the JSON in command arguments or Git.       |
+| `add <alias> --stdin`            | Private JSON on stdin: `name`, `url`, `key`, optional `chatUrl` | Noninteractive setup used by Add Grok Bot; never put the JSON in arguments. |
 | `compose <alias>`                | Interactive message prompt                                      | Sends once and prints a receipt.                                            |
 
 Run the bundled CLI from the checkout with `npm run bots -- <command>`.

@@ -14,16 +14,14 @@ In the Bot's own conversation, ask it to create an active webhook routine:
 
 > Create a webhook routine for messages from my Raycast extension. The JSON body contains version, requestId, message and source. Treat message as my forwarded request while keeping your existing approval boundaries. Use requestId to recognize duplicates. Reply in this Bot conversation and include requestId. For acknowledgment-only messages, acknowledge without calling tools. Show me where to open the routine's private Webhook URL and Webhook key fields; do not print their values in the conversation.
 
-Open the routine's private settings, then run in your own terminal:
+Open the routine's private settings. Then, after [registering the extension](#register-and-use-raycast), choose **Add Grok Bot** in Raycast. It's also **⌘N** in **Message Grok Bot**, and the default action when no Bots are configured.
 
-```sh
-npm run bots -- add fleet
-```
+1. Enter a display name, such as **Fleet**. The alias is suggested from it.
+2. Paste the webhook URL into its masked field.
+3. Paste the **key only**, without the `Bearer ` prefix, into its masked field.
+4. Press **⌘Return**. The extension passes these values to the local sender on stdin; Raycast doesn't keep them in preferences or form drafts.
 
-1. Enter a display name, such as **Fleet**.
-2. Paste the webhook URL into the hidden prompt.
-3. Paste the **key only**, without the `Bearer ` prefix, into its hidden prompt.
-4. The optional chat link can be left blank. The extension opens the installed Grok Bot app instead.
+To add a Bot from a terminal instead, run `npm run bots -- add fleet` and answer the same prompts. The URL and key are hidden while you type. The terminal also asks for an optional chat link, which can be left blank; the extension opens the installed Grok Bot app instead.
 
 The supported routine URL is `https://api2.cursor.sh/automations/webhook/…`. Other hosts, query parameters, redirects and HTTP URLs are refused. If your Bot offers a different endpoint or an HMAC signing secret, this sender needs an adaptation to that documented contract; a signing secret is not a bearer key.
 
@@ -58,11 +56,12 @@ A `raycast://` link opens a command from outside Raycast. On **Request to run Me
 | Symptom                                                     | What to do                                                                                                                                             |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `node` or `npm` is missing, or setup reports an old version | Install Node.js 24.11+, reopen your terminal and check `node --version`.                                                                               |
-| **No Bots configured**                                      | Run `npm run bots -- list`. Add a Bot if the list is empty, then use **Reload Bots** in Raycast.                                                       |
+| **No Bots configured**                                      | Press Return to add a Bot. If you added one in a terminal, run `npm run bots -- list` to check it, then use **Reload Bots**.                           |
 | **No matching Bots or deliveries**                          | Press Return on **Clear Search**, or enter an exact configured alias followed by a message.                                                            |
 | **Sender unavailable**                                      | Run `~/.local/bin/grok-bots list` privately. Keep the checkout and Node executable at their original locations. Setup preserves any existing sender.   |
 | Config or receipt permissions error                         | Inspect the named directory/file privately; restore owner-only permissions. Avoid recursive permission changes to unrelated files.                     |
 | Setup says another setup is running                         | Finish that setup first. If interrupted, inspect the PID in `.setup.lock` and confirm it is no longer running before removing that one stale lock.     |
+| **Bot not added**                                           | Check the URL and key against the routine's private settings. If it persists, run `npm run bots -- list` privately to check the sender.                |
 | **Rejected** delivery                                       | Check that the routine is active and its current key matches the private config.                                                                       |
 | **Unknown** delivery                                        | Keep the request ID. Check the Bot conversation first, then **Check Delivery Receipt**. Never bypass duplicate protection with a new ID just to retry. |
 | The command isn't in Raycast                                | Run `npm run dev` on the Mac and wait for compilation to finish.                                                                                       |

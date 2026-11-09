@@ -11,7 +11,7 @@
 Message your existing **Grok Bots** without leaving your keyboard. Choose a Bot, write a message, and get a clear delivery receipt. Read its reply in the Grok Bot app.
 
 - **Quick to compose.** Type `fleet say hi` → Return to review → ⌘Return to send.
-- **Credentials stay local.** Hidden setup prompts; no keys in Raycast preferences, message arguments, or the repository.
+- **Credentials stay local.** Masked setup fields; no keys in Raycast preferences, form drafts, command arguments, or the repository.
 - **Send once.** A saved request ID, explicit submit, and no automatic retries.
 - **Useful history.** Delivery states and timestamps, without saving message text.
 
@@ -35,25 +35,21 @@ npm run setup
 
 Setup installs `~/.local/bin/grok-bots` and checks it. If you already have that sender, it keeps it unchanged. Keep this checkout and Node.js in place: the sender uses their absolute paths.
 
-### 2. Connect a Bot privately
-
-[Create a webhook routine in your Bot](docs/setup.md#connect-your-bot), then run:
-
-```sh
-npm run bots -- add fleet
-```
-
-Enter its display name, webhook URL and **key only** at the prompts. The URL and key are hidden while you type. Credentials stay in `~/.config/grok-bots` with private file permissions. Repeat with a different alias for each Bot. Already configured? Skip this step.
-
-### 3. Open it in Raycast
+### 2. Open it in Raycast
 
 ```sh
 npm run dev
 ```
 
-When it says **built extension successfully**, open Raycast and choose **Message Grok Bot**. Select a Bot, or type `fleet say hi`. **Return** opens the draft; **⌘Return** sends it.
+Wait for **built extension successfully**. You can then stop the watcher with **Ctrl+C**; the compiled commands stay installed. Run `npm run dev` again after updating. This is a local extension, not a Raycast Store listing.
 
-After registration you can stop the watcher with **Ctrl+C**; the compiled command stays installed. Run `npm run dev` again after updating. This is a local extension, not a Raycast Store listing.
+### 3. Connect a Bot privately
+
+[Create a webhook routine in your Bot](docs/setup.md#connect-your-bot), then open Raycast and choose **Add Grok Bot**. Enter a display name, an alias such as `fleet`, the webhook URL and the **key only**. The URL and key are masked, and Raycast doesn't store them: the local sender saves them in `~/.config/grok-bots` with private file permissions. Repeat with a different alias for each Bot. Already configured? Skip this step.
+
+Prefer the terminal? `npm run bots -- add fleet` asks for the same details at hidden prompts.
+
+Now choose **Message Grok Bot**. Select a Bot, or type `fleet say hi`. **Return** opens the draft; **⌘Return** sends it.
 
 If an external `raycast://` link shows **Request to run Message Grok Bot**, choose **Always Run Command** once to remember approval for this command. Launching it directly inside Raycast avoids the external-link prompt.
 
