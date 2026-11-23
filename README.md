@@ -16,9 +16,13 @@ Message your existing **Grok Bots** without leaving your keyboard. Choose a Bot,
 - **Useful history.** Delivery states and timestamps, without saving message text.
 
 <p align="center">
-  <img src="docs/images/compose.png" alt="The native Raycast composer with Fleet selected and say hi ready to review" width="780">
-  <br><sub>Native Raycast UI. Opening a draft does not send it.</sub>
+  <img src="docs/images/draft-preview.png" alt="Split-pane Raycast live draft preview for Fleet showing the typed message and delivery metadata" width="780">
+  <br><sub>Live draft preview in native Raycast. Press Return to review, then ⌘Return to send (⌘⇧D toggles details).</sub>
 </p>
+
+| Bot list & delivery summary | Composer |
+| --- | --- |
+| <img src="docs/images/list-overview.png" alt="Split-pane Bot list with per-Bot accents, delivery history, and metadata" width="380"> | <img src="docs/images/compose.png" alt="Native Raycast composer with Fleet selected and delivery details below" width="380"> |
 
 ## Get started
 
