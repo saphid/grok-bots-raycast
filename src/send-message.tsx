@@ -25,6 +25,8 @@ import {
   botHistorySummary,
   BotTone,
   botTone,
+  escapeMarkdownInline,
+  formatAttentionSummary,
   formatBotDetailMarkdown,
   formatByteCount,
   formatReceiptMarkdown,
@@ -164,7 +166,7 @@ function ReceiptView({
             title="Submitted"
             text={formatTimestamp(receipt.createdAt)}
           />
-          {details && receipt.httpStatus && (
+          {details && Boolean(receipt.httpStatus) && (
             <Detail.Metadata.Label
               title="HTTP"
               text={String(receipt.httpStatus)}
@@ -465,7 +467,7 @@ export default function Command() {
                   title="Submitted"
                   text={formatTimestamp(receipt.createdAt)}
                 />
-                {receipt.httpStatus && (
+                {Boolean(receipt.httpStatus) && (
                   <List.Item.Detail.Metadata.Label
                     title="HTTP"
                     text={String(receipt.httpStatus)}
@@ -545,7 +547,7 @@ export default function Command() {
             icon={{ source: Icon.ExclamationMark, tintColor: Color.Orange }}
             detail={
               <List.Item.Detail
-                markdown={`# Check the Mac sender\n\n${error}`}
+                markdown={`# Check the Mac sender\n\n${escapeMarkdownInline(error)}`}
               />
             }
             actions={
@@ -649,6 +651,7 @@ export default function Command() {
                           />
                         </List.Item.Detail.Metadata.TagList>
                         <List.Item.Detail.Metadata.Label
+                          key={`draft-size-${formatByteCount(draftBytes).length}`}
                           title="Size"
                           text={formatByteCount(draftBytes)}
                         />
@@ -688,11 +691,7 @@ export default function Command() {
                         )}
                         <List.Item.Detail.Metadata.Label
                           title="Recent sends"
-                          text={
-                            summary.attentionCount > 0
-                              ? `${summary.total} (${summary.attentionCount} need attention)`
-                              : String(summary.total)
-                          }
+                          text={formatAttentionSummary(summary)}
                         />
                         <List.Item.Detail.Metadata.Separator />
                         <List.Item.Detail.Metadata.Label
