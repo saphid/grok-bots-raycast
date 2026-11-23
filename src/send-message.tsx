@@ -20,6 +20,16 @@ import { useEffect, useRef, useState } from "react";
 import { deliver, loadHistory, saveReceipt, Storage } from "./history";
 import { Bot, createRequest, Receipt, Sender, validateMessage } from "./sender";
 import { parseComposeQuery } from "./compose-query";
+import {
+  botDropdownTitle,
+  botHistorySummary,
+  BotTone,
+  botTone,
+  formatBotDetailMarkdown,
+  formatByteCount,
+  formatReceiptMarkdown,
+  formatSearchPlaceholder,
+} from "./ui-helpers";
 
 async function openBot() {
   try {
@@ -39,6 +49,27 @@ const storage: Storage = {
   getItem: (key) => LocalStorage.getItem<string>(key),
   setItem: (key, value) => LocalStorage.setItem(key, value),
 };
+
+const toneColors: Record<BotTone, Color> = {
+  blue: Color.Blue,
+  purple: Color.Purple,
+  green: Color.Green,
+  orange: Color.Orange,
+  magenta: Color.Magenta,
+  yellow: Color.Yellow,
+};
+
+function botColor(alias: string): Color {
+  return toneColors[botTone(alias)];
+}
+
+function formatTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 const states = {
   accepted: {
     title: "Message accepted",
@@ -113,10 +144,14 @@ function ReceiptView({
     <Detail
       navigationTitle={`${name} · ${state.label}`}
       isLoading={busy}
-      markdown={`# ${state.title}\n\n${state.text}\n\n${state.next}${details ? `\n\n---\n\n**Request ID**\n\n\`${receipt.requestId}\`\n\n${receipt.httpStatus ? `HTTP ${receipt.httpStatus} · ` : ""}This is a delivery receipt, not the Bot’s answer.` : ""}`}
+      markdown={formatReceiptMarkdown(state, receipt, details)}
       metadata={
         <Detail.Metadata>
-          <Detail.Metadata.Label title="To" text={name} icon={Icon.Message} />
+          <Detail.Metadata.Label
+            title="To"
+            text={name}
+            icon={{ source: Icon.Message, tintColor: botColor(receipt.bot) }}
+          />
           <Detail.Metadata.TagList title="Delivery">
             <Detail.Metadata.TagList.Item
               text={state.label}
@@ -127,12 +162,19 @@ function ReceiptView({
           <Detail.Metadata.Separator />
           <Detail.Metadata.Label
             title="Submitted"
-            text={new Date(receipt.createdAt).toLocaleString(undefined, {
-              dateStyle: "medium",
-              timeStyle: "short",
-            })}
+            text={formatTimestamp(receipt.createdAt)}
           />
+          {details && receipt.httpStatus && (
+            <Detail.Metadata.Label
+              title="HTTP"
+              text={String(receipt.httpStatus)}
+            />
+          )}
           <Detail.Metadata.Label title="Conversation" text="Grok Bot" />
+          <Detail.Metadata.Label
+            title="Privacy"
+            text="Message text not saved"
+          />
         </Detail.Metadata>
       }
       actions={
@@ -190,6 +232,7 @@ function Compose({
   initialMessage?: string;
   onUpdate: () => Promise<void>;
 }) {
+  const { pop } = useNavigation();
   const sending = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -244,6 +287,13 @@ function Compose({
             icon={Icon.ArrowUp}
             onSubmit={submit}
           />
+          <Action
+            title="Open Grok Bot"
+            icon={Icon.Message}
+            shortcut={Keyboard.Shortcut.Common.Open}
+            onAction={openBot}
+          />
+          <Action title="Back to Bots" icon={Icon.ArrowLeft} onAction={pop} />
         </ActionPanel>
       }
     >
@@ -258,8 +308,8 @@ function Compose({
           <Form.Dropdown.Item
             key={bot.alias}
             value={bot.alias}
-            title={bot.name}
-            icon={Icon.Message}
+            title={botDropdownTitle(bot)}
+            icon={{ source: Icon.Message, tintColor: botColor(bot.alias) }}
           />
         ))}
       </Form.Dropdown>
@@ -276,19 +326,22 @@ function Compose({
           setMessageBytes(Buffer.byteLength(value, "utf8"));
         }}
       />
-      {messageBytes > 28_000 && (
-        <Form.Description
-          title="Length"
-          text={`${messageBytes.toLocaleString()} / 32,000 bytes`}
-        />
-      )}
+      <Form.Separator />
       <Form.Description
+        title="Delivery"
         text={
           busy
             ? `Sending to ${selectedBot.name}… Please wait for the delivery receipt.`
-            : "Messages aren’t saved. Replies appear in Grok Bot."
+            : "Press ⌘Return to send once. Opening a draft never sends it."
         }
       />
+      <Form.Description
+        title="Privacy"
+        text="Message text isn’t saved. Replies appear in Grok Bot."
+      />
+      {messageBytes > 0 && (
+        <Form.Description title="Size" text={formatByteCount(messageBytes)} />
+      )}
     </Form>
   );
 }
@@ -301,7 +354,12 @@ export default function Command() {
   const [error, setError] = useState<string>();
   const [selectedId, setSelectedId] = useState<string>();
   const [searchText, setSearchText] = useState("");
+  const [showingDetail, setShowingDetail] = useState(true);
   const draft = parseComposeQuery(searchText, bots);
+  const draftBytes = draft ? Buffer.byteLength(draft.message, "utf8") : 0;
+  const hasListContent =
+    bots.length > 0 || history.length > 0 || Boolean(error);
+  const detailVisible = showingDetail && hasListContent;
   const reloadHistory = async () => setHistory(await loadHistory(storage));
   async function load() {
     setBusy(true);
@@ -330,22 +388,28 @@ export default function Command() {
     void load();
   }, []);
 
+  function toggleDetailsAction() {
+    return (
+      <Action
+        title={showingDetail ? "Hide Details" : "Show Details"}
+        icon={Icon.AppWindowSidebarRight}
+        shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
+        onAction={() => setShowingDetail((current) => !current)}
+      />
+    );
+  }
+
   function receiptRow(receipt: Receipt) {
     const state = states[receipt.status];
     const name =
       bots.find((bot) => bot.alias === receipt.bot)?.name ?? receipt.bot;
-    const label = {
-      accepted: "Accepted",
-      rejected: "Rejected",
-      unknown: "Unknown",
-    }[receipt.status];
     return (
       <List.Item
         id={receipt.requestId}
         key={receipt.requestId}
         title={name}
         subtitle={
-          receipt.status === "unknown"
+          !detailVisible && receipt.status === "unknown"
             ? "Check conversation before resending"
             : undefined
         }
@@ -357,13 +421,69 @@ export default function Command() {
           "history",
         ]}
         icon={{ source: state.icon, tintColor: state.color }}
-        accessories={[
-          { tag: { value: label, color: state.color } },
-          {
-            date: new Date(receipt.createdAt),
-            tooltip: `${new Date(receipt.createdAt).toLocaleString()} · ${receipt.requestId}`,
-          },
-        ]}
+        accessories={
+          detailVisible
+            ? [
+                {
+                  date: new Date(receipt.createdAt),
+                  tooltip: `${state.label} · ${new Date(receipt.createdAt).toLocaleString()} · ${receipt.requestId}`,
+                },
+              ]
+            : [
+                { tag: { value: state.label, color: state.color } },
+                {
+                  date: new Date(receipt.createdAt),
+                  tooltip: `${new Date(receipt.createdAt).toLocaleString()} · ${receipt.requestId}`,
+                },
+              ]
+        }
+        detail={
+          <List.Item.Detail
+            markdown={formatReceiptMarkdown(
+              state,
+              receipt,
+              receipt.status === "unknown",
+            )}
+            metadata={
+              <List.Item.Detail.Metadata>
+                <List.Item.Detail.Metadata.Label
+                  title="To"
+                  text={name}
+                  icon={{
+                    source: Icon.Message,
+                    tintColor: botColor(receipt.bot),
+                  }}
+                />
+                <List.Item.Detail.Metadata.TagList title="Delivery">
+                  <List.Item.Detail.Metadata.TagList.Item
+                    text={state.label}
+                    color={state.color}
+                    icon={state.icon}
+                  />
+                </List.Item.Detail.Metadata.TagList>
+                <List.Item.Detail.Metadata.Label
+                  title="Submitted"
+                  text={formatTimestamp(receipt.createdAt)}
+                />
+                {receipt.httpStatus && (
+                  <List.Item.Detail.Metadata.Label
+                    title="HTTP"
+                    text={String(receipt.httpStatus)}
+                  />
+                )}
+                <List.Item.Detail.Metadata.Separator />
+                <List.Item.Detail.Metadata.Label
+                  title="Conversation"
+                  text="Grok Bot"
+                />
+                <List.Item.Detail.Metadata.Label
+                  title="Privacy"
+                  text="Message text not saved"
+                />
+              </List.Item.Detail.Metadata>
+            }
+          />
+        }
         actions={
           <ActionPanel>
             <Action
@@ -382,8 +502,10 @@ export default function Command() {
             <Action
               title="Open Grok Bot"
               icon={Icon.Message}
+              shortcut={Keyboard.Shortcut.Common.Open}
               onAction={openBot}
             />
+            {toggleDetailsAction()}
             <Action.CopyToClipboard
               title="Copy Request ID"
               content={receipt.requestId}
@@ -402,8 +524,9 @@ export default function Command() {
   return (
     <List
       isLoading={busy}
+      isShowingDetail={detailVisible}
       navigationTitle="Grok Bots"
-      searchBarPlaceholder="Choose a Bot, or type fleet <message>…"
+      searchBarPlaceholder={formatSearchPlaceholder(bots)}
       searchText={searchText}
       onSearchTextChange={(text) => {
         setSearchText(text);
@@ -418,8 +541,13 @@ export default function Command() {
           <List.Item
             id="sender-error"
             title="Sender unavailable"
-            subtitle="Reload to reconnect"
+            subtitle={detailVisible ? undefined : "Reload to reconnect"}
             icon={{ source: Icon.ExclamationMark, tintColor: Color.Orange }}
+            detail={
+              <List.Item.Detail
+                markdown={`# Check the Mac sender\n\n${error}`}
+              />
+            }
             actions={
               <ActionPanel>
                 <Action
@@ -427,6 +555,7 @@ export default function Command() {
                   icon={Icon.ArrowClockwise}
                   onAction={load}
                 />
+                {toggleDetailsAction()}
                 <Action
                   title="Show Setup Help"
                   icon={Icon.Info}
@@ -450,48 +579,170 @@ export default function Command() {
             .map(receiptRow)}
       </List.Section>
       <List.Section title="Message a Bot">
-        {(draft ? [draft.bot] : bots).map((bot) => (
-          <List.Item
-            id={`bot-${bot.alias}`}
-            key={bot.alias}
-            title={bot.name}
-            subtitle={
-              draft ? "Review typed message, then send" : "Write a message"
-            }
-            keywords={[bot.alias, "new", "compose", "send"]}
-            icon={{ source: Icon.Message, tintColor: Color.Blue }}
-            actions={
-              <ActionPanel>
-                <Action
-                  title={`Message ${bot.name}`}
-                  icon={Icon.Pencil}
-                  onAction={() => {
-                    push(
-                      <Compose
-                        bots={bots}
-                        initialBot={bot}
-                        initialMessage={draft?.message}
-                        onUpdate={reloadHistory}
-                      />,
-                    );
-                    setSearchText("");
-                  }}
+        {(draft ? [draft.bot] : bots).map((bot) => {
+          const summary = botHistorySummary(history, bot.alias);
+          const latestState = summary.latest
+            ? states[summary.latest.status]
+            : undefined;
+          const tint = botColor(bot.alias);
+          return (
+            <List.Item
+              id={`bot-${bot.alias}`}
+              key={bot.alias}
+              title={bot.name}
+              subtitle={
+                draft
+                  ? detailVisible
+                    ? "Draft ready"
+                    : "Review typed message, then send"
+                  : detailVisible
+                    ? undefined
+                    : "Write a message"
+              }
+              keywords={[bot.alias, "new", "compose", "send"]}
+              icon={{ source: Icon.Message, tintColor: tint }}
+              accessories={
+                draft
+                  ? [{ tag: { value: "Draft", color: Color.Orange } }]
+                  : detailVisible
+                    ? latestState && summary.latest
+                      ? [
+                          {
+                            icon: {
+                              source: latestState.icon,
+                              tintColor: latestState.color,
+                            },
+                            tooltip: `${latestState.label} · ${new Date(summary.latest.createdAt).toLocaleString()}`,
+                          },
+                        ]
+                      : [{ text: bot.alias }]
+                    : [
+                        { tag: { value: bot.alias, color: tint } },
+                        ...(latestState && summary.latest
+                          ? [
+                              {
+                                tag: {
+                                  value: latestState.label,
+                                  color: latestState.color,
+                                },
+                              },
+                            ]
+                          : []),
+                      ]
+              }
+              detail={
+                <List.Item.Detail
+                  markdown={formatBotDetailMarkdown(bot, draft?.message)}
+                  metadata={
+                    draft ? (
+                      <List.Item.Detail.Metadata>
+                        <List.Item.Detail.Metadata.Label
+                          title="To"
+                          text={bot.name}
+                          icon={{ source: Icon.Message, tintColor: tint }}
+                        />
+                        <List.Item.Detail.Metadata.TagList title="Status">
+                          <List.Item.Detail.Metadata.TagList.Item
+                            text="Draft · Not sent"
+                            color={Color.Orange}
+                            icon={Icon.Pencil}
+                          />
+                        </List.Item.Detail.Metadata.TagList>
+                        <List.Item.Detail.Metadata.Label
+                          title="Size"
+                          text={formatByteCount(draftBytes)}
+                        />
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.Label
+                          title="Privacy"
+                          text="Not saved in history"
+                        />
+                      </List.Item.Detail.Metadata>
+                    ) : (
+                      <List.Item.Detail.Metadata>
+                        <List.Item.Detail.Metadata.TagList title="Alias">
+                          <List.Item.Detail.Metadata.TagList.Item
+                            text={bot.alias}
+                            color={tint}
+                          />
+                        </List.Item.Detail.Metadata.TagList>
+                        <List.Item.Detail.Metadata.TagList title="Last delivery">
+                          {latestState ? (
+                            <List.Item.Detail.Metadata.TagList.Item
+                              text={latestState.label}
+                              color={latestState.color}
+                              icon={latestState.icon}
+                            />
+                          ) : (
+                            <List.Item.Detail.Metadata.TagList.Item
+                              text="None yet"
+                              color={Color.SecondaryText}
+                            />
+                          )}
+                        </List.Item.Detail.Metadata.TagList>
+                        {summary.latest && (
+                          <List.Item.Detail.Metadata.Label
+                            title="Last sent"
+                            text={formatTimestamp(summary.latest.createdAt)}
+                          />
+                        )}
+                        <List.Item.Detail.Metadata.Label
+                          title="Recent sends"
+                          text={
+                            summary.attentionCount > 0
+                              ? `${summary.total} (${summary.attentionCount} need attention)`
+                              : String(summary.total)
+                          }
+                        />
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.Label
+                          title="Credentials"
+                          text="Local (~/.config/grok-bots)"
+                        />
+                      </List.Item.Detail.Metadata>
+                    )
+                  }
                 />
-                <Action
-                  title="Open Grok Bot"
-                  icon={Icon.Message}
-                  onAction={openBot}
-                />
-                <Action
-                  title="Reload Bots and History"
-                  icon={Icon.ArrowClockwise}
-                  shortcut={Keyboard.Shortcut.Common.Refresh}
-                  onAction={load}
-                />
-              </ActionPanel>
-            }
-          />
-        ))}
+              }
+              actions={
+                <ActionPanel>
+                  <Action
+                    title={
+                      draft
+                        ? `Review Draft for ${bot.name}`
+                        : `Message ${bot.name}`
+                    }
+                    icon={Icon.Pencil}
+                    onAction={() => {
+                      push(
+                        <Compose
+                          bots={bots}
+                          initialBot={bot}
+                          initialMessage={draft?.message}
+                          onUpdate={reloadHistory}
+                        />,
+                      );
+                      setSearchText("");
+                    }}
+                  />
+                  <Action
+                    title="Open Grok Bot"
+                    icon={Icon.Message}
+                    shortcut={Keyboard.Shortcut.Common.Open}
+                    onAction={openBot}
+                  />
+                  {toggleDetailsAction()}
+                  <Action
+                    title="Reload Bots and History"
+                    icon={Icon.ArrowClockwise}
+                    shortcut={Keyboard.Shortcut.Common.Refresh}
+                    onAction={load}
+                  />
+                </ActionPanel>
+              }
+            />
+          );
+        })}
       </List.Section>
       <List.Section
         title="Recent deliveries"
